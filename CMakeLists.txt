@@ -34,13 +34,14 @@ include_directories(
 )
 catkin_package()
 
-# add_library(vins_rgbd SHARED src/parameters.cpp
+add_library(stair_detector_edge SHARED src/stair_detector_geo.cpp
 #    src/estimator.cpp
-# )
+)
 
-# target_link_libraries(vins_rgbd ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES} ) # /usr/local/lib/libSophus.so
+target_link_libraries(stair_detector_edge ${catkin_LIBRARIES} ${OpenCV_LIBS} ) # /usr/local/lib/libSophus.so
 
-add_executable(stair_detection_node src/stair_detection_node.cpp src/stair_detector_geo.cpp)
+add_executable(stair_detection_node src/stair_detection_node.cpp )
+target_link_libraries(stair_detection_node stair_detector_edge) # /usr/local/lib/libSophus.so
 
-target_link_libraries(stair_detection_node ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES}) # /usr/local/lib/libSophus.so
-
+add_executable(test_img src/test_img.cpp)
+target_link_libraries(test_img stair_detector_edge)

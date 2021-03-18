@@ -90,10 +90,10 @@ void img_callback(const sensor_msgs::ImageConstPtr &color_msg, const sensor_msgs
         img.encoding = "bgr8";
         ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::BGR8);
         ret_img = ptr->image.clone(); 
-        cv::cvtColor(ret_img, ret_img, cv::COLOR_BGR2GRAY);
+        // cv::cvtColor(ret_img, ret_img, cv::COLOR_BGR2GRAY);
     }
     else{
-        ptr = cv_bridge::toCvCopy(color_msg, sensor_msgs::image_encodings::MONO8);
+        ptr = cv_bridge::toCvCopy(color_msg, sensor_msgs::image_encodings::BGR8);
         ret_img = ptr->image.clone(); 
     }
 
@@ -119,10 +119,10 @@ void img_callback(const sensor_msgs::ImageConstPtr &color_msg, const sensor_msgs
     cv::Mat dep_img = depth_ptr->image.clone(); 
 
 
-   // cv::imshow("vis", show_img);
-   // cv::waitKey(5);
-   cv::imshow("dep", dep_img); 
-   cv::waitKey(5); 
+   cv::imshow("Color_image", show_img);
+   cv::waitKey(5);
+   // cv::imshow("dep", dep_img); 
+   // cv::waitKey(5); 
 
 
     std::vector<cv::Point> show_bounding_box;
@@ -165,13 +165,16 @@ int main(int argc, char **argv)
 
     cv::namedWindow("Result");
     cv::namedWindow("Depth_image");
+    cv::namedWindow("Color_image"); 
     cv::startWindowThread();
 
     // param.debug = false;
-    param.fill_invalid = false;
+    param.fill_invalid = true;
     param.ignore_invalid = false;
     param.use_laplacian = false;
-    param.debug = true; 
+    param.minimum_line_num = 10;
+    param.neighbour_count = 3; 
+    param.debug = false; 
     sdg.setParam(param);
 
     //ref: http://docs.ros.org/api/message_filters/html/c++/classmessage__filters_1_1TimeSynchronizer.html#a9e58750270e40a2314dd91632a9570a6
@@ -187,6 +190,7 @@ int main(int argc, char **argv)
     ros::spin();
     cv::destroyWindow("Result");
     cv::destroyWindow("Depth_image");
+    cv::destroyWindow("Color_image");
     return 0;
 }
 

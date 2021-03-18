@@ -82,8 +82,8 @@ struct StairDetectorGeoParams
 	// hough transfrom
 	double hough_min_line_length = 25; // pixel distance
 	double hough_max_line_gap = 15;   // pixel distance
-	double hough_threshold = 20;      //
-	int    hough_rho = 8;            //
+	double hough_threshold = 20;      // number of pixels on the line 
+	int    hough_rho = 1; // 8;            //
 	double hough_theta = 1;           // angle
 	// filter by slope histogram
 	double filter_slope_hist_bin_width = 20;  // degree
@@ -94,7 +94,11 @@ struct StairDetectorGeoParams
 	double merge_max_angle_diff = 30; // degree
 	int    merge_close_count = 10; // number
 	// bounding box
-	int    minimum_line_num = 3;
+	int    minimum_line_num = 3;  // the minimal number of the final lines 
+	double minimum_stair_length = 20; // the minimal average length of the stairs 
+	double minimum_stair_run = 40; // the minimal run of the stairs 
+
+	int neighbour_count = 15; // how many neighboring pixels to query 
 };
 
 

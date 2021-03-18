@@ -1,5 +1,7 @@
 #include "stair_detector_geo.h"
 
+using namespace cv;
+
 StairDetectorGeo::StairDetectorGeo() {
 	// run a empty set param to convert all the angle into radius
 	StairDetectorGeoParams param;
@@ -37,14 +39,17 @@ bool StairDetectorGeo::getStairs(const cv::Mat& input_image, std::vector<cv::Poi
 		cannyEdgeDetection(src_gray, edge);
 	}
 	// sobelEdgeDetection(src_gray, edge_image);
-	cv::imshow("edge image", edge);
-	cv::imshow("depth", src_gray);
+	// cv::imshow("edge image", edge);
+	// cv::imshow("depth", src_gray);
 	if (param_.ignore_invalid) {
 		ignoreInvalid(src_gray, edge);
 	}
 
 	if (param_.debug) {
+		cv::imshow("converted image", src_gray);
+    	cv::waitKey(0);
 		cv::imshow("edge image", edge);
+		waitKey(0);
 	}
 
 	Lines lines;
@@ -163,7 +168,7 @@ void StairDetectorGeo::visualizeHist(const std::vector<int> hist, int height, st
 	cv::convertScaleAbs(tmp4, tmp4, 255 / max);
 	cv::Mat tmp5;
 	applyColorMap(tmp4, tmp5, cv::COLORMAP_AUTUMN);
-	cv::imshow(window_name, tmp5);
+	// cv::imshow(window_name, tmp5);
 }
 
 
@@ -184,7 +189,7 @@ void StairDetectorGeo::houghLine(const cv::Mat &edge_image, Lines &lines) {
 
 	std::vector<cv::Vec4i> xy_lines;
 	HoughLinesP(edge_image, xy_lines,
-	            (double)param_.hough_rho / 10,
+	            (double)param_.hough_rho , // / 10,
 	            (double)param_.hough_theta,
 	            (int)	param_.hough_threshold,
 	            (double)param_.hough_min_line_length,
@@ -278,7 +283,7 @@ void StairDetectorGeo::filterLinesBySlopeHist(const Lines& input_lines, Lines& f
  */
 bool StairDetectorGeo::getBoundingBox(const cv::Mat input_rgb_image, const Lines &input_lines, std::vector<cv::Point>& bounding_box) {
 	bounding_box.clear();
-	if (input_lines.size() < 3) {
+	if (input_lines.size() < param_.minimum_line_num ) {
 		if (param_.debug) {
 			std::cout << "There is no stair because not much lines detected" << std::endl;
 		}
@@ -288,7 +293,7 @@ bool StairDetectorGeo::getBoundingBox(const cv::Mat input_rgb_image, const Lines
 	// step 1 filter lines by it's slope
 	Lines filtered_lines;
 	filterLinesBySlopeThreshold(input_lines, filtered_lines);
-	if (filtered_lines.size() < 3) {
+	if (filtered_lines.size() < param_.minimum_line_num ) {
 		if (param_.debug) {
 			std::cout << "There is no stair because not much lines detected after filter" << std::endl;
 		}
@@ -297,7 +302,7 @@ bool StairDetectorGeo::getBoundingBox(const cv::Mat input_rgb_image, const Lines
 	// step 2 merge lines after filtering
 	Lines merged_lines;
 	mergeLines(input_rgb_image, filtered_lines, merged_lines);
-	if (merged_lines.size() < 3) {
+	if (merged_lines.size() < param_.minimum_line_num ) {
 		if (param_.debug) {
 			std::cout << "There is no stair because not much lines detected after merge" << std::endl;
 		}
@@ -331,14 +336,17 @@ bool StairDetectorGeo::getBoundingBox(const cv::Mat input_rgb_image, const Lines
 
 	if (param_.debug) {
 		cv::imshow("depth", input_rgb_image);
+		waitKey(0);
 		cv::Mat tmp1;
 		input_rgb_image.copyTo(tmp1);
 		drawLines(tmp1, input_lines, cv::Scalar(0, 0, 255));
 		cv::imshow("before filter", tmp1);
+		waitKey(0);
 		cv::Mat tmp2;
 		input_rgb_image.copyTo(tmp2);
 		drawLines(tmp2, filtered_lines, cv::Scalar(0, 0, 255));
 		cv::imshow("after filter before merge", tmp2);
+		waitKey(0);
 		std::cout << "Maximum Frequency Column is " << max_frequency_col << std::endl;
 	}
 
@@ -407,6 +415,7 @@ bool StairDetectorGeo::getBoundingBox(const cv::Mat input_rgb_image, const Lines
 		drawLines(tmp3, merged_lines, cv::Scalar(0, 0, 255));
 		cv::rectangle(tmp3, p1, p2, cv::Scalar(255, 0, 0), 3, 8);
 		cv::imshow("after filter after merge", tmp3);
+		waitKey(0);
 	}
 
 	if (param_.debug) {
@@ -421,10 +430,12 @@ bool StairDetectorGeo::getBoundingBox(const cv::Mat input_rgb_image, const Lines
 		cv::Point p4(max_frequency_col, input_rgb_image.rows);
 		cv::line(tmp4, p3, p4, cv::Scalar(0, 255, 255), 3, 8);
 		drawLinesSlope(tmp4, final_lines, cv::Scalar(255, 255, 0));
-		cv::imshow("Result", tmp4);
+		cv::imshow("Result 4", tmp4);
+		waitKey(0);
 	}
 
-	if (final_lines.size() < param_.minimum_line_num || (right_most - left_most) < 20) {
+	if (final_lines.size() < param_.minimum_line_num || abs(right_most - left_most) < param_.minimum_stair_length  
+		|| abs(up_most-down_most) < param_.minimum_stair_run) {
 		if (param_.debug) {
 			std::cout << "There is no a stair because final lines size are less than " << param_.minimum_line_num << std::endl;
 		}
@@ -765,11 +776,11 @@ void StairDetectorGeo::fillByNearestNeighbour(const cv::Mat& input_image, cv::Ma
 					}
 					// y is row, x is col
 					unsigned char value = input_image.at<uchar>(pos.second, pos.first);
+					if (count > param_.neighbour_count) {
+						break;
+					}
 					if (value == 0) {
 						continue;
-					}
-					if (count > 50) {
-						break;
 					}
 					// using temperary image will cost a lot of time when the image has a lot of invalid pixel
 					// filled_image_tmp.at<uchar>(i, j) = value;
