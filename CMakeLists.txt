@@ -13,6 +13,10 @@ find_package(catkin REQUIRED COMPONENTS
     nav_msgs
     tf
     cv_bridge 
+    pcl_conversions
+    pcl_ros
+    message_filters
+    image_transport
     )
 
 find_package(OpenCV REQUIRED)
@@ -45,3 +49,8 @@ target_link_libraries(stair_detection_node stair_detector_edge) # /usr/local/lib
 
 add_executable(test_img src/test_img.cpp)
 target_link_libraries(test_img stair_detector_edge)
+
+
+### node receive pose and images 
+add_executable(stair_detection_pose_node src/stair_detection_pose_node.cpp src/pc_from_image.cpp)
+target_link_libraries(stair_detection_pose_node stair_detector_edge) # /usr/local/lib/libSophus.so

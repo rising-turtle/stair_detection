@@ -1,0 +1,27 @@
+<launch>
+
+
+  <arg name="rgbd_vio_dir" default="$(find rgbd_vio)"/> <!--new_struct_core struct_core_v2 -->
+
+  <arg name="config_file" default="$(find rgbd_vio)/config/struct_core_v2.yaml"/> <!--new_struct_core struct_core_v2 -->
+  <!--arg name="vins_folder" default="$(find rgbd_vio)/result"/-->
+
+  <node pkg="rgbd_vio" type="feature_tracker_rgbd_vio" name="feature_tracker" output="log">
+    <param name="config_file" type="string" value="$(arg config_file)"/>
+    <param name="publish_keyframe_color_image" type="bool" value="true"/>
+  </node>
+
+  <node pkg="rgbd_vio" type="rgbd_vio_node" name="rvio_node" output="log">
+    <param name="config_file" type="string" value="$(arg config_file)"/>
+    <param name="publish_keyframe_depth_image" type="bool" value="true"/>
+  </node>
+
+  <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find stair_detection)/launch/stair_detection_pose_demo.rviz"/>
+  
+  <node pkg="stair_detection" type="stair_detection_pose_node" name="stair_detection_pose" output="screen">
+
+  </node>
+
+
+
+</launch>
