@@ -36,6 +36,8 @@
 #include "pc_from_image.h"
 #include "transform_pc.hpp"
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
 
 using namespace std; 
 
@@ -56,6 +58,8 @@ cv::Mat handle_depth_msg(const sensor_msgs::ImageConstPtr &depth_msg);
 
 
 ros::Publisher pub_world_pc; 
+ros::Publisher pub_detected_stair;
+
 
 void img_callback(const sensor_msgs::ImageConstPtr &color_msg, const sensor_msgs::ImageConstPtr &depth_msg)
 {
@@ -66,45 +70,35 @@ void img_callback(const sensor_msgs::ImageConstPtr &color_msg, const sensor_msgs
     con.notify_one(); 
 }
 
-/*
-void img_callback(const sensor_msgs::ImageConstPtr &color_msg, const sensor_msgs::ImageConstPtr &depth_msg)
-{
-    std::vector<cv::Point> show_bounding_box;
-    try
-    {
-        // cv::Mat depth_image = cv_bridge::toCvCopy(msg, "8UC1")->image;
-        cv::Mat depth_image = dep_img;
-        // dep_img.convertTo(depth_image, CV_8UC1, 255./5000.); // maximum 5 meters 
+bool detect_stair(cv::Mat depth_image, std::vector<cv::Point>& bounding_box ){
+    static int times = 0; 
+    static int times_threshold = 3; // consecutive times larger than this threshold 
 
-        cv::imshow("Depth_image", depth_image); 
-        cv::waitKey(10);
-        if (sdg.getStairs(depth_image, show_bounding_box)) {
-          
-            std::cout << "Found Potential Stiars" << std::endl;
-            sdg.drawBox(show_img, show_bounding_box);
-        
-            cv::imshow("Result", show_img);
-            cv::waitKey(10);
+    if(sdg.getStairs(depth_image, bounding_box)){
+        ROS_INFO("stair_detection_pose_node: found potential stair, count %d", ++times); 
+        if(times >= times_threshold){
+            ROS_DEBUG("stair_detection_pose_node: succeed to detect stair"); 
 
-        } else {
-         
-            std::cout << "Can't find stiars" << std::endl;
+            // further check out 
+
+
+
+            return true; 
         }
+        return false; 
+    }else{
+        times = 0; 
     }
-    catch (cv_bridge::Exception& e)
-    {
-        // ROS_ERROR("Could not convert from '%s' to '8UC1'.", msg->encoding.c_str());
-    }
-
-
-    // init pts here, using readImage()
-    ROS_INFO("depth_image size: width: %d height: %d", dep_img.cols, dep_img.rows);
-}*/
+    return false; 
+}
 
 void pcd_thread()
 {
     tf::TransformListener listener; 
 
+    bool found_stair = false; 
+    
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr detected_pc_stair(new pcl::PointCloud<pcl::PointXYZRGB>);    
 
     while(ros::ok()){
 
@@ -137,11 +131,11 @@ void pcd_thread()
                               msg_time, ros::Duration(2.0));
             listener.lookupTransform("world", "camera",  
                                msg_time, transform);
-            // ROS_DEBUG("stair_detection_with_pose: receive Tw2c translation: %lf %lf %lf at %lf", 
-                // transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z(), transform.stamp_.toSec()); 
+            ROS_DEBUG("stair_detection_with_pose: receive Tw2c translation: %lf %lf %lf at %lf", 
+                transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z(), transform.stamp_.toSec()); 
         }
         catch (tf::TransformException ex){
-            // ROS_ERROR("%s",ex.what());
+            ROS_ERROR("%s",ex.what());
             // ros::Duration(1.0).sleep();
             continue; 
         }
@@ -152,14 +146,43 @@ void pcd_thread()
         // cv::imshow("Depth_image", dpt_m);
         // cv::waitKey(5); 
 
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr pc_world(new pcl::PointCloud<pcl::PointXYZRGB>); 
+        if(!found_stair){
+            std::vector<cv::Point> bounding_box;
+            pcl::PointCloud<pcl::PointXYZRGB>::Ptr pc_cam(new pcl::PointCloud<pcl::PointXYZRGB>); 
 
-        // generate pcd 
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr pc_cam(new pcl::PointCloud<pcl::PointXYZRGB>); 
-        generateColorPointCloud(img_m, dpt_m, *pc_cam, 2) ;
+            if(detect_stair(dpt_m, bounding_box)){
+                // generate pcd 
+                generateColorPointCloudBoundingBox(img_m, dpt_m, *pc_cam,bounding_box, 2);
 
+                // publish the results 
+                sdg.drawBox(img_m, bounding_box);
+                sensor_msgs::Image img_msg; // >> message to be sent
+                std_msgs::Header header; // empty header
+                header.stamp = msg_time;  
+                cv_bridge::CvImage img_bridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::RGB8, img_m);
+                img_bridge.toImageMsg(img_msg); // from cv_bridge to sensor_msgs::Image
+                pub_detected_stair.publish(img_msg); 
 
-        // transform into world coordinate 
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr pc_world = transform_pc(pc_cam, transform);
+                // change the color of the detected stair 
+                markColor(*pc_cam, PURPLE);             
+                
+                // transform into world coordinate 
+                detected_pc_stair = transform_pc(pc_cam, transform);
+                pc_world = detected_pc_stair; 
+                found_stair = true; 
+                pcl::io::savePCDFile("potential_stair_box.pcd", *detected_pc_stair); 
+
+            }  else{
+                // generate pcd 
+                generateColorPointCloud(img_m, dpt_m, *pc_cam, 2) ;
+
+                // transform into world coordinate 
+                pc_world = transform_pc(pc_cam, transform);
+            }
+        }else{
+                pc_world = detected_pc_stair; 
+        }
 
         // publish it  
         sensor_msgs::PointCloud2 pc_world_msg;
@@ -167,6 +190,7 @@ void pcd_thread()
         pc_world_msg.header.frame_id = "world";  
         pc_world_msg.header.stamp = msg_time;
         pub_world_pc.publish(pc_world_msg);
+    
         ros::spinOnce(); 
     }
 
@@ -234,6 +258,8 @@ int main(int argc, char **argv)
 
     // setup publishers 
     pub_world_pc = n.advertise<sensor_msgs::PointCloud2>("/current_point_cloud", 1000); 
+
+    pub_detected_stair = n.advertise<sensor_msgs::Image>("/stair_detection_results", 1000); 
 
     std::thread pcd_thread_{pcd_thread}; 
     // std::thread tf_listener_{tf_listener}; 
@@ -304,3 +330,5 @@ cv::Mat handle_depth_msg(const sensor_msgs::ImageConstPtr &depth_msg)
 
     return depth_ptr->image; 
 }
+
+

@@ -14,6 +14,14 @@ double CY = 2.58998e+02;
 double FX = 4.59357e+02; 
 double FY = 4.59764e+02; 
 
+int g_color[][3] = {255, 0, 0,  //RED
+                            0, 255, 0, // GREEN
+                            0, 0, 255,  // BLUE
+                            255, 0, 255, // PURPLE
+                            255, 255,255, // WHITE
+                            255, 255, 0 // YELLOW
+                        };
+
 void generateColorPointCloud(cv::Mat& rgb, cv::Mat& dpt, pcl::PointCloud<pcl::PointXYZRGB>& pc_out, int skip ) 
 {  
   double z; 
@@ -77,6 +85,80 @@ void generateColorPointCloud(cv::Mat& rgb, cv::Mat& dpt, pcl::PointCloud<pcl::Po
 
 }
 
+
+void generateColorPointCloudBoundingBox(cv::Mat& rgb, cv::Mat& dpt, pcl::PointCloud<pcl::PointXYZRGB>& pc_out, std::vector<cv::Point>& bounding_box, int skip)
+{
+  double z; 
+  double px, py, pz; 
+  int height = rgb.rows/skip; 
+  int width = rgb.cols/skip; 
+  int N = (rgb.rows/skip)*(rgb.cols/skip); 
+
+  pc_out.points.reserve(N); 
+  // pc.width = width; 
+  // pc.height = height; 
+
+  unsigned char r, g, b; 
+  int pixel_data_size = 3; 
+  if(rgb.type() == CV_8UC1)
+  {
+    pixel_data_size = 1; 
+  }
+  
+  int color_idx; 
+  char red_idx = 2, green_idx =1, blue_idx = 0;
+
+  // Point pt; 
+  pcl::PointXYZRGB pt;
+
+  cv::Point left_up = bounding_box[0]; 
+  cv::Point right_down = bounding_box[1]; 
+
+  int left_most = left_up.x; 
+  int up_most = left_up.y; 
+  int right_most = right_down.x; 
+  int down_most = right_down.y; 
+
+  for(int v = up_most; v<rgb.rows && v<down_most; v+=skip)
+  for(int u = left_most; u<rgb.cols && u < right_most; u+=skip)
+  {
+    // Point& pt = pc.points[v*width + u]; 
+    z = dpt.at<unsigned short>((v), (u))*0.001;
+    if(std::isnan(z) || z <= 0.0) 
+    {
+      // pt.x = std::numeric_limits<float>::quiet_NaN();  
+      // pt.y = std::numeric_limits<float>::quiet_NaN();  
+      // pt.z = std::numeric_limits<float>::quiet_NaN();  
+      continue; 
+    }
+
+    double nu = (u - CX)/FX; 
+    double nv = (v - CY)/FY; 
+    px = nu * z; 
+    py = nv * z; 
+    pz = z; 
+
+    pt.x = px;  pt.y = py;  pt.z = pz; 
+    color_idx = (v*rgb.cols + u)*pixel_data_size;
+    if(pixel_data_size == 3)
+    {
+      r = rgb.at<uint8_t>(color_idx + red_idx);
+      g = rgb.at<uint8_t>(color_idx + green_idx); 
+      b = rgb.at<uint8_t>(color_idx + blue_idx);
+    }else{
+      r = g = b = rgb.at<uint8_t>(color_idx); 
+    }
+    pt.r = r; pt.g = g; pt.b = b; 
+    pc_out.points.push_back(pt); 
+  }
+  pc_out.height = 1; 
+  pc_out.width = pc_out.points.size(); 
+  pc_out.is_dense = true; 
+  return ;
+} 
+
+
+
 void generateFilteredPointCloud(const cv::Mat& dpt_img, pcl::PointCloud<pcl::PointXYZ>& pc_out)
 {
     // median filter to get rid some noise 
@@ -130,4 +212,22 @@ void generateFilteredPointCloud(const cv::Mat& dpt_img, pcl::PointCloud<pcl::Poi
     downSizeFilter.setLeafSize(0.03, 0.03, 0.03);
     downSizeFilter.filter(pc_out);
     return ; 
+}
+
+
+bool markColor(pcl::PointCloud<pcl::PointXYZRGB>& cloud, COLOR c)
+{
+  if(cloud.points.size() <= 0)
+  {
+    // cout<<"global_def.cpp: cloud has no points!"<<endl;
+    return false;
+  }
+  int N = cloud.points.size();
+  for(int i=0; i<N; i++)
+  {
+    cloud.points[i].r = g_color[c][0];
+    cloud.points[i].g = g_color[c][1];
+    cloud.points[i].b = g_color[c][2];
+  }
+  return true;
 }
