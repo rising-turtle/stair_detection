@@ -10,6 +10,8 @@ Panels:
         - /world2imu1/Tree1
         - /est_path1
         - /PointCloud1
+        - /stair_direction_arrow1
+        - /stair_location1
       Splitter Ratio: 0.5
     Tree Height: 150
   - Class: rviz/Selection
@@ -394,6 +396,22 @@ Visualization Manager:
       Transport Hint: raw
       Unreliable: false
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /stair_detection_pose/visual_stair_direction
+      Name: stair_direction_arrow
+      Namespaces:
+        basic_shapes: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /stair_detection_pose/visual_stair_location
+      Name: stair_location
+      Namespaces:
+        basic_shapes: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 0; 0; 0
@@ -419,25 +437,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 22.6038094
+      Distance: 11.2563534
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 5.0067749
-        Y: -4.36385059
-        Z: 5.3930397
+        X: -4.51653862
+        Y: 7.84476709
+        Z: 2.12990546
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.824796855
+      Pitch: 0.634797156
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.455358148
+      Yaw: 3.21535516
     Saved: ~
 Window Geometry:
   Depthmap:
@@ -459,7 +477,7 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1324
-  X: 469
-  Y: 120
+  X: 244
+  Y: 51
   stair_detection:
     collapsed: false
