@@ -186,7 +186,8 @@ void pcd_thread()
                     detected_pc_stair = out_pc; 
                     pc_world = detected_pc_stair; 
                     found_stair = true; 
-                    // pcl::io::savePCDFile("detected_stair_box.pcd", *detected_pc_stair); 
+                   //  markColor(*detected_pc_stair, RED);
+                   // pcl::io::savePCDFile("detected_stair_box.pcd", *detected_pc_stair); 
 
                     ROS_INFO("stair_detection_pose_node: stair location: %lf %lf %lf", anchor_pt[0], anchor_pt[1], anchor_pt[2]); 
                 }
