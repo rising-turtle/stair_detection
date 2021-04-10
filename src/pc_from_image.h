@@ -22,6 +22,7 @@
 
 typedef enum {RED = 0, GREEN, BLUE, PURPLE, WHITE, YELLOW} COLOR; 
 extern double CX, CY, FX, FY; // camera intrinsics 
+extern int IMAGE_WIDTH, IMAGE_HEIGHT; 
 
 extern bool markColor(pcl::PointCloud<pcl::PointXYZRGB>& cloud, COLOR c); 
 extern void generateFilteredPointCloud(const cv::Mat& dpt_img, pcl::PointCloud<pcl::PointXYZ>& pc_out); 

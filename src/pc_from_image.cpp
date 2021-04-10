@@ -14,6 +14,10 @@ double CY = 2.58998e+02;
 double FX = 4.59357e+02; 
 double FY = 4.59764e+02; 
 
+int IMAGE_WIDTH = 640;
+int IMAGE_HEIGHT = 480; 
+
+
 int g_color[][3] = {255, 0, 0,  //RED
                             0, 255, 0, // GREEN
                             0, 0, 255,  // BLUE

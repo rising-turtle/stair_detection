@@ -99,7 +99,7 @@ bool StairDetectorPCD::detect_stair_pcd(PointCloudT::Ptr& in_pc, PointCloudC::Pt
     std::cout<<"stair_detector_pcd: There are treads: "<<stairTreads.size()<<std::endl;
     std::cout<<"stair_detector_pcd: There are risers: "<<stairRisers.size()<<std::endl;
 
-    if(stairTreads.size() < 5){
+    if(stairTreads.size() < 3){
     	std::cout<<"stair_detector_pcd: There are too few treads: "<<stairTreads.size()<<std::endl;
     	return false; 
     }

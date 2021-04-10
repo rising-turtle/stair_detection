@@ -284,8 +284,8 @@ void StairDetectorGeo::filterLinesBySlopeHist(const Lines& input_lines, Lines& f
 bool StairDetectorGeo::getBoundingBox(const cv::Mat input_rgb_image, const Lines &input_lines, std::vector<cv::Point>& bounding_box) {
 	bounding_box.clear();
 	if (input_lines.size() < param_.minimum_line_num ) {
-		if (param_.debug) {
-			std::cout << "There is no stair because not much lines detected" << std::endl;
+		if (param_.debug || param_.text_debug) {
+			std::cout << "There is no stair because not much lines detected input_lines: "<< input_lines.size() <<" < "<<param_.minimum_line_num << std::endl;
 		}
 		return false;
 	}
@@ -294,8 +294,8 @@ bool StairDetectorGeo::getBoundingBox(const cv::Mat input_rgb_image, const Lines
 	Lines filtered_lines;
 	filterLinesBySlopeThreshold(input_lines, filtered_lines);
 	if (filtered_lines.size() < param_.minimum_line_num ) {
-		if (param_.debug) {
-			std::cout << "There is no stair because not much lines detected after filter" << std::endl;
+		if (param_.debug || param_.text_debug) {
+			std::cout << "There is no stair because not much lines detected after filter lines: "<<filtered_lines.size() <<" < "<<param_.minimum_line_num<< std::endl;
 		}
 		return false;
 	}
@@ -303,8 +303,8 @@ bool StairDetectorGeo::getBoundingBox(const cv::Mat input_rgb_image, const Lines
 	Lines merged_lines;
 	mergeLines(input_rgb_image, filtered_lines, merged_lines);
 	if (merged_lines.size() < param_.minimum_line_num ) {
-		if (param_.debug) {
-			std::cout << "There is no stair because not much lines detected after merge" << std::endl;
+		if (param_.debug || param_.text_debug) {
+			std::cout << "There is no stair because not much lines detected after merge lines: " << merged_lines.size()<<" < "<<param_.minimum_line_num<< std::endl;
 		}
 		return false;
 	}
@@ -436,7 +436,7 @@ bool StairDetectorGeo::getBoundingBox(const cv::Mat input_rgb_image, const Lines
 
 	if (final_lines.size() < param_.minimum_line_num || abs(right_most - left_most) < param_.minimum_stair_length  
 		|| abs(up_most-down_most) < param_.minimum_stair_run) {
-		if (param_.debug) {
+		if (param_.debug || param_.text_debug) {
 			std::cout << "There is no a stair because final lines size are less than " << param_.minimum_line_num << std::endl;
 		}
 		return false;

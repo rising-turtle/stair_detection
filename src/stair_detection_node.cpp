@@ -175,6 +175,7 @@ int main(int argc, char **argv)
     param.minimum_line_num = 10;
     param.neighbour_count = 3; 
     param.debug = false; 
+    param.text_debug = true; 
     sdg.setParam(param);
 
     //ref: http://docs.ros.org/api/message_filters/html/c++/classmessage__filters_1_1TimeSynchronizer.html#a9e58750270e40a2314dd91632a9570a6

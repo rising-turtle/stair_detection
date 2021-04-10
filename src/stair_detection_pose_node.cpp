@@ -71,6 +71,10 @@ ros::Publisher pub_detected_stair;
 ros::Publisher pub_stair_dir;
 ros::Publisher pub_stair_loc; 
 
+void print_tf(tf::Vector3 t, string pre=""){
+    cout<<pre<<"\t"<<t.getX()<<"\t"<<t.getY()<<"\t"<<t.getZ()<<endl; 
+}
+
 // parameters 
 int times_threshold = 3; 
 
@@ -83,44 +87,10 @@ void img_callback(const sensor_msgs::ImageConstPtr &color_msg, const sensor_msgs
     con.notify_one(); 
 }
 
-bool detect_stair(cv::Mat depth_image, std::vector<cv::Point>& bounding_box ){
-    static int times = 0; 
-    // static int times_threshold = 3; // consecutive times larger than this threshold 
+bool detect_stair(cv::Mat depth_image, std::vector<cv::Point>& bounding_box );
 
-    if(sdg.getStairs(depth_image, bounding_box)){
-        ROS_INFO("stair_detection_pose_node: found potential stair, count %d", ++times); 
-        if(times >= times_threshold){
-            ROS_DEBUG("stair_detection_pose_node: succeed to detect stair"); 
-
-            // try to extend the bounding box 
-            cv::Point& left_up = bounding_box[0]; 
-            cv::Point& right_down = bounding_box[1]; 
-
-            // cout <<"before extend, "<<left_up.x<<" - "<<right_down.x<<endl; 
-            int extend_len = 30;
-            int left_most = left_up.x; 
-            // int up_most = left_up.y; 
-            int right_most = right_down.x; 
-            // int down_most = right_down.y; 
-            if(left_most - extend_len > 0)
-                left_up.x = left_most - extend_len; 
-            else
-                left_up.x = 0; 
-            if(right_most + extend_len < depth_image.cols)
-                right_down.x = right_most + extend_len; 
-            else
-                right_down.x = depth_image.cols - 1; 
-
-            // cout <<"after extend, "<<left_up.x<<" - "<<right_down.x<<endl; 
-
-            return true; 
-        }
-        return false; 
-    }else{
-        times = 0; 
-    }
-    return false; 
-}
+std::vector<cv::Point> back_project(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& pc_c, tf::Transform Twc); 
+std::vector<cv::Point> find_bounding_box(std::vector<cv::Point>& pts);
 
 void pcd_thread()
 {
@@ -131,6 +101,8 @@ void pcd_thread()
     
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr detected_pc_stair(new pcl::PointCloud<pcl::PointXYZRGB>);   
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr downsampled_pc_stair(new pcl::PointCloud<pcl::PointXYZRGB>);    
+
+    double IMAGE_AREA = IMAGE_HEIGHT*IMAGE_WIDTH; 
 
     while(ros::ok()){
 
@@ -194,14 +166,14 @@ void pcd_thread()
                 pcl::PointCloud<pcl::PointXYZRGB>::Ptr out_pc(new pcl::PointCloud<pcl::PointXYZRGB>); 
                 if(sd_pcd.detect_stair_pcd(pc_world, out_pc, &anchor_pt[0])){
                     
-                    // publish the results 
-                    sdg.drawBox(img_m, bounding_box);
-                    sensor_msgs::Image img_msg; // >> message to be sent
-                    std_msgs::Header header; // empty header
-                    header.stamp = msg_time;  
-                    cv_bridge::CvImage img_bridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::RGB8, img_m);
-                    img_bridge.toImageMsg(img_msg); // from cv_bridge to sensor_msgs::Image
-                    pub_detected_stair.publish(img_msg); 
+                    // // publish the results 
+                    // sdg.drawBox(img_m, bounding_box);
+                    // sensor_msgs::Image img_msg; // >> message to be sent
+                    // std_msgs::Header header; // empty header
+                    // header.stamp = msg_time;  
+                    // cv_bridge::CvImage img_bridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::RGB8, img_m);
+                    // img_bridge.toImageMsg(img_msg); // from cv_bridge to sensor_msgs::Image
+                    // pub_detected_stair.publish(img_msg); 
 
                     // change the color of the detected stair 
                     // markColor(*pc_cam, PURPLE);             
@@ -229,26 +201,80 @@ void pcd_thread()
         }else{
                 pc_world = detected_pc_stair; 
 
-                // we know anchor point and current camera pose 
-
-                // 
+                // we know anchor point and current camera pose  
                 tf::Transform Tiw = transform.inverse(); 
                 tf::Vector3 stair_pt_w(anchor_pt[0], anchor_pt[1], anchor_pt[2]); 
                 tf::Vector3 stair_pt_c = Tiw * stair_pt_w; 
+                tf::Vector3 cam_loc_c(0, 0, 0); 
+                tf::Vector3 cam_loc_w = transform * cam_loc_c;
+
+                tf::Vector3 cam_loc(transform.getOrigin().getX(), transform.getOrigin().getY(), transform.getOrigin().getZ()); 
+                tf::Vector3 cam_to_stair_in_w = stair_pt_w - cam_loc; 
+                tf::Vector3 cam_to_stair_in_c = Tiw.getBasis() * cam_to_stair_in_w;
+
+                // print_tf(cam_loc_w, "cam_loc_w"); 
+                // print_tf(cam_loc, "cam_loc"); 
+                // print_tf(stair_pt_w, "stair_pt_w"); 
+                // print_tf(stair_pt_c, "stair_pt_c"); 
+                // print_tf(cam_to_stair_in_w, "cam_to_stair_in_w"); 
+                // print_tf(cam_to_stair_in_c, "cam_to_stair_in_c");
 
                 tf::Vector3 heading_dir(0, 0, 1); 
-                tf::Vector3 heading_in_w = transform * heading_dir; 
+                tf::Vector3 heading_in_w = transform.getBasis() * heading_dir; 
 
-                double theta = heading_dir.angle(stair_pt_c); 
+                // double theta1 = heading_dir.angle(stair_pt_c); 
+
+                heading_in_w.setZ(0);  cam_to_stair_in_w.setZ(0) ; 
+                double theta = heading_in_w.angle(cam_to_stair_in_w); 
                 double distance = stair_pt_c.length(); 
+                double distance_horizontal = cam_to_stair_in_w.length();
+                
+
+                // cout <<"theta1: "<<R2D(theta1)<<" theta: "<<R2D(theta)<<endl; 
+                // cout <<"stair_pt_c: "<<stair_pt_c.getX()/distance<<"\t"<<stair_pt_c.getY()/distance<<"\t"<<stair_pt_c.getZ()/distance<<endl;
+                // cout <<"cam_to_stair_in_c: "<<cam_to_stair_in_c.getX()/cam_to_stair_in_c.length()<<"\t"<<cam_to_stair_in_c.getY()/cam_to_stair_in_c.length()
+                    // <<"\t"<<cam_to_stair_in_c.getZ()/cam_to_stair_in_c.length()<<endl;
 
                 static ofstream ouf("motion_feature.log"); 
-
-                cout <<"stair_detection_pose_node.cpp: detect stair horizontal distance: "<< sqrt(SQ(stair_pt_w.getX() - transform.getOrigin().getX()) 
+                cout <<"stair_detection_pose_node.cpp: detect stair, angle: "<< R2D(theta)<<" horizontal distance: "<< sqrt(SQ(stair_pt_w.getX() - transform.getOrigin().getX()) 
                     + SQ(stair_pt_w.getY() - transform.getOrigin().getY())) <<endl;
 
-                ouf<<std::fixed<<msg_time.toSec()<<"\t"<<distance<<"\t"<<R2D(theta)<<"\t"<<stair_pt_c.getX()/distance<<
-                        "\t"<<stair_pt_c.getY()/distance<<"\t"<<stair_pt_c.getZ()/distance<<endl; 
+
+                // compute bounding box of the stair in currect image plane 
+                vector<cv::Point> proj_2d_pts = back_project(downsampled_pc_stair, Tiw); 
+
+                if(proj_2d_pts.size() >=2){
+
+                    std::vector<cv::Point> bx = find_bounding_box(proj_2d_pts);
+
+                    // compute center and normalized bx area
+                    cv::Point left_up = bx[0]; 
+                    cv::Point right_down = bx[1]; 
+
+                    cv::Point bx_center((left_up.x+right_down.x)/2, (left_up.y+right_down.y)/2); 
+                    double bx_area = (right_down.x - left_up.x) * (right_down.y - left_up.y); 
+
+                    ouf<<std::fixed<<msg_time.toSec()<<"\t"<<distance_horizontal<<"\t"<<R2D(theta)<<"\t"<<stair_pt_c.getX()/distance<<
+                            "\t"<<stair_pt_c.getY()/distance<<"\t"<<stair_pt_c.getZ()/distance<<"\t"
+                            <<bx_center.x<<"\t"<<bx_center.y<<"\t"<<(right_down.x - left_up.x)<<"\t"<<(right_down.y - left_up.y)<<"\t"<<(bx_area/IMAGE_AREA)<<endl; 
+
+                     // publish the results 
+                    sdg.drawBox(img_m, bx);
+                    sensor_msgs::Image img_msg; // >> message to be sent
+                    std_msgs::Header header; // empty header
+                    header.stamp = msg_time;  
+                    cv_bridge::CvImage img_bridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::RGB8, img_m);
+                    img_bridge.toImageMsg(img_msg); // from cv_bridge to sensor_msgs::Image
+                    pub_detected_stair.publish(img_msg); 
+
+                }else{
+
+                    ROS_WARN("stair_detection_pose_node.cpp: stair is out of camera view!"); 
+                    ouf<<std::fixed<<msg_time.toSec()<<"\t"<<distance<<"\t"<<R2D(theta)<<"\t"<<stair_pt_c.getX()/distance<<
+                            "\t"<<stair_pt_c.getY()/distance<<"\t"<<stair_pt_c.getZ()/distance<<"\t"
+                            <<-1<<"\t"<<-1<<"\t"<<0<<"\t"<<0<<"\t"<<0<<endl; 
+
+                }
 
                 // publish stair direction  
                 visualization_msgs::Marker arrow_marker;
@@ -364,9 +390,12 @@ int main(int argc, char **argv)
     param.minimum_line_num = 10;
     param.neighbour_count = 3; 
     param.debug = false; 
-    sdg.setParam(param);
+    param.text_debug = true; 
 
-    n.param("times_threshold", times_threshold, times_threshold); 
+    n.param("times_threshold", times_threshold, times_threshold);
+    n.param("minimum_line_num", param.minimum_line_num, param.minimum_line_num);  
+
+    sdg.setParam(param);
 
     //ref: http://docs.ros.org/api/message_filters/html/c++/classmessage__filters_1_1TimeSynchronizer.html#a9e58750270e40a2314dd91632a9570a6
     //     https://blog.csdn.net/zyh821351004/article/details/47758433
@@ -395,6 +424,91 @@ int main(int argc, char **argv)
     return 0;
 }
 
+std::vector<cv::Point> find_bounding_box(std::vector<cv::Point>& pts)
+{
+    assert(pts.size() > 0); 
+    cv::Point left_up, right_down; 
+    left_up = right_down = pts[0]; 
+    for(int j=1; j<pts.size();j++){
+        cv::Point pt = pts[j]; 
+        if(left_up.x > pt.x) left_up.x = pt.x; 
+        if(left_up.y > pt.y) left_up.y = pt.y; 
+        if(right_down.x < pt.x) right_down.x = pt.x; 
+        if(right_down.y < pt.y) right_down.y = pt.y;
+    }
+    std::vector<cv::Point> bx; 
+    bx.push_back(left_up); 
+    bx.push_back(right_down); 
+    return bx; 
+}
+
+std::vector<cv::Point> back_project(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& pc_w, tf::Transform Tcw)
+{
+    std::vector<cv::Point> ret;
+
+    for(int i=0; i<pc_w->points.size(); i++){
+
+        pcl::PointXYZRGB& pt = pc_w->points[i]; 
+        tf::Vector3 pt_w(pt.x, pt.y, pt.z); 
+        tf::Vector3 pt_c = Tcw * pt_w; 
+
+        // perspective projection 
+
+        if(pt_c.getZ() < 0.02) continue; 
+
+        cv::Point tmp_pt;
+        tmp_pt.x = (pt_c.getX()/pt_c.getZ())*FX + CX; 
+        tmp_pt.y = (pt_c.getY()/pt_c.getZ())*FY + CY; 
+
+        if(tmp_pt.x <= 0 || tmp_pt.x >= IMAGE_WIDTH-1)
+            continue; 
+        if(tmp_pt.y <= 0 || tmp_pt.y >= IMAGE_HEIGHT -1)
+            continue; 
+
+        ret.push_back(tmp_pt); 
+    }
+
+    return ret; 
+}
+
+bool detect_stair(cv::Mat depth_image, std::vector<cv::Point>& bounding_box ){
+    static int times = 0; 
+    // static int times_threshold = 3; // consecutive times larger than this threshold 
+
+    if(sdg.getStairs(depth_image, bounding_box)){
+        ROS_INFO("stair_detection_pose_node: found potential stair, count %d", ++times); 
+        if(times >= times_threshold){
+            ROS_DEBUG("stair_detection_pose_node: succeed to detect stair"); 
+
+            // try to extend the bounding box 
+            cv::Point& left_up = bounding_box[0]; 
+            cv::Point& right_down = bounding_box[1]; 
+
+            // cout <<"before extend, "<<left_up.x<<" - "<<right_down.x<<endl; 
+            int extend_len = 30;
+            int left_most = left_up.x; 
+            // int up_most = left_up.y; 
+            int right_most = right_down.x; 
+            // int down_most = right_down.y; 
+            if(left_most - extend_len > 0)
+                left_up.x = left_most - extend_len; 
+            else
+                left_up.x = 0; 
+            if(right_most + extend_len < depth_image.cols)
+                right_down.x = right_most + extend_len; 
+            else
+                right_down.x = depth_image.cols - 1; 
+
+            // cout <<"after extend, "<<left_up.x<<" - "<<right_down.x<<endl; 
+
+            return true; 
+        }
+        return false; 
+    }else{
+        times = 0; 
+    }
+    return false; 
+}
 
 cv::Mat handle_color_msg(const sensor_msgs::ImageConstPtr &color_msg)
 {

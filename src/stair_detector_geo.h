@@ -72,6 +72,7 @@ struct StairDetectorGeoParams
 	// high level bools
 	bool show_result = false;
 	bool debug = false;
+	bool text_debug = false; 
 	bool ignore_invalid = false;
 	bool fill_invalid = false;
 	bool use_laplacian = false;

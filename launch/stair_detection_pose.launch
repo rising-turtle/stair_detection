@@ -20,6 +20,7 @@
   
   <node pkg="stair_detection" type="stair_detection_pose_node" name="stair_detection_pose" output="screen">
     <param name="times_threshold" type="int" value="1"/>
+    <param name="minimum_line_num" type="int" value="3"/> <!-- 7 -->
   </node>
 
 
