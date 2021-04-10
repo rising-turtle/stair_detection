@@ -41,10 +41,12 @@
 #include "stair_detector_pcd.h"
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point.h>
+#include "downsample_pc.hpp"
 
 using namespace std; 
 
 #define R2D(r) ((r)*180./3.141592654)
+#define SQ(x) (((x)*(x)))
 
 StairDetectorGeo sdg;
 StairDetectorGeoParams param;
@@ -72,7 +74,6 @@ ros::Publisher pub_stair_loc;
 // parameters 
 int times_threshold = 3; 
 
-
 void img_callback(const sensor_msgs::ImageConstPtr &color_msg, const sensor_msgs::ImageConstPtr &depth_msg)
 {
     mutex_img_buf.lock();
@@ -90,6 +91,28 @@ bool detect_stair(cv::Mat depth_image, std::vector<cv::Point>& bounding_box ){
         ROS_INFO("stair_detection_pose_node: found potential stair, count %d", ++times); 
         if(times >= times_threshold){
             ROS_DEBUG("stair_detection_pose_node: succeed to detect stair"); 
+
+            // try to extend the bounding box 
+            cv::Point& left_up = bounding_box[0]; 
+            cv::Point& right_down = bounding_box[1]; 
+
+            // cout <<"before extend, "<<left_up.x<<" - "<<right_down.x<<endl; 
+            int extend_len = 30;
+            int left_most = left_up.x; 
+            // int up_most = left_up.y; 
+            int right_most = right_down.x; 
+            // int down_most = right_down.y; 
+            if(left_most - extend_len > 0)
+                left_up.x = left_most - extend_len; 
+            else
+                left_up.x = 0; 
+            if(right_most + extend_len < depth_image.cols)
+                right_down.x = right_most + extend_len; 
+            else
+                right_down.x = depth_image.cols - 1; 
+
+            // cout <<"after extend, "<<left_up.x<<" - "<<right_down.x<<endl; 
+
             return true; 
         }
         return false; 
@@ -106,7 +129,8 @@ void pcd_thread()
     bool found_stair = false; 
     double anchor_pt[3]; 
     
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr detected_pc_stair(new pcl::PointCloud<pcl::PointXYZRGB>);    
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr detected_pc_stair(new pcl::PointCloud<pcl::PointXYZRGB>);   
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr downsampled_pc_stair(new pcl::PointCloud<pcl::PointXYZRGB>);    
 
     while(ros::ok()){
 
@@ -160,6 +184,7 @@ void pcd_thread()
             pcl::PointCloud<pcl::PointXYZRGB>::Ptr pc_cam(new pcl::PointCloud<pcl::PointXYZRGB>); 
 
             if(detect_stair(dpt_m, bounding_box)){
+
                 // generate pcd 
                 generateColorPointCloudBoundingBox(img_m, dpt_m, *pc_cam,bounding_box, 2);
 
@@ -188,6 +213,8 @@ void pcd_thread()
                     found_stair = true; 
                    //  markColor(*detected_pc_stair, RED);
                    // pcl::io::savePCDFile("detected_stair_box.pcd", *detected_pc_stair); 
+                    downsampled_pc_stair = downsample_pc(pc_world, 0.2); 
+                    // markColor(*downsampled_pc_stair, RED);
 
                     ROS_INFO("stair_detection_pose_node: stair location: %lf %lf %lf", anchor_pt[0], anchor_pt[1], anchor_pt[2]); 
                 }
@@ -216,6 +243,9 @@ void pcd_thread()
                 double distance = stair_pt_c.length(); 
 
                 static ofstream ouf("motion_feature.log"); 
+
+                cout <<"stair_detection_pose_node.cpp: detect stair horizontal distance: "<< sqrt(SQ(stair_pt_w.getX() - transform.getOrigin().getX()) 
+                    + SQ(stair_pt_w.getY() - transform.getOrigin().getY())) <<endl;
 
                 ouf<<std::fixed<<msg_time.toSec()<<"\t"<<distance<<"\t"<<R2D(theta)<<"\t"<<stair_pt_c.getX()/distance<<
                         "\t"<<stair_pt_c.getY()/distance<<"\t"<<stair_pt_c.getZ()/distance<<endl; 

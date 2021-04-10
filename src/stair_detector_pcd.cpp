@@ -188,12 +188,12 @@ bool StairDetectorPCD::detect_stair_pcd(PointCloudT::Ptr& in_pc, PointCloudC::Pt
 		    	}
 
 		    	map<double, int>::iterator it = vz.begin(); 
-		    	it++; it++; 
+		    	// it++; it++; 
 
 		    	// PointT& pt = stairCoefficients.stairTreads.centerCloud.points[stairCoefficients.anchPoint]; 
 		    	PointT& pt = stairCoefficients.stairParts.centerCloud.points[it->second]; 
 		    	central_pt[0] = pt.x; central_pt[1] = pt.y; central_pt[2] = pt.z; 
-		    	cout <<"The third smallest is: "<<pt.x<<" "<<pt.y<<" "<<pt.z<<endl; 
+		    	cout <<"The smallest is: "<<pt.x<<" "<<pt.y<<" "<<pt.z<<endl; 
 
 		    	// PointT& pt = stairCoefficients.stairTreads.centerCloud.points[stairCoefficients.anchPoint]; 
 		    	// central_pt[0] = pt.x; central_pt[1] = pt.y; central_pt[2] = pt.z; 
